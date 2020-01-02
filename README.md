@@ -2,7 +2,7 @@ Autosmug
 ========
 
 
-These scripts are for automating some SmugMug operations once might perform on a regular basis, for example, uploading new files in a local folder to a gallery on smugmug. OAuth is used for authentication.
+These scripts are for automating some SmugMug operations one might perform on a regular basis, for example, daily/weekly uploading new files in a local folder to a gallery on smugmug.
 
 
 Requirements

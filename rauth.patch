@@ -1,0 +1,38 @@
+*** env/lib/python3.7/site-packages/rauth/session.py.bak	2019-10-19 14:04:09.476368601 -0700
+--- env/lib/python3.7/site-packages/rauth/session.py	2019-08-31 18:53:38.216846853 -0700
+***************
+*** 183,190 ****
+          if header_auth and 'oauth_signature' not in \
+                  req_kwargs['headers'].get('Authorization', ''):
+              req_kwargs['auth'] = OAuth1Auth(oauth_params, realm)
+!         elif entity_method and 'oauth_signature' not in \
+!                 (req_kwargs.get('data') or {}):
+              req_kwargs['data'] = req_kwargs.get('data') or {}
+  
+              # If we have a urlencoded entity-body we should pass the OAuth
+--- 183,190 ----
+          if header_auth and 'oauth_signature' not in \
+                  req_kwargs['headers'].get('Authorization', ''):
+              req_kwargs['auth'] = OAuth1Auth(oauth_params, realm)
+!         elif entity_method and not isinstance(req_kwargs.get('data'), bytes) \
+!                 and 'oauth_signature' not in (req_kwargs.get('data') or {}):
+              req_kwargs['data'] = req_kwargs.get('data') or {}
+  
+              # If we have a urlencoded entity-body we should pass the OAuth
+***************
+*** 225,231 ****
+          for oauth_param in OPTIONAL_OAUTH_PARAMS:
+              if oauth_param in params:
+                  oauth_params[oauth_param] = params.pop(oauth_param)
+!             if oauth_param in data:
+                  oauth_params[oauth_param] = data.pop(oauth_param)
+  
+              if params:
+--- 225,231 ----
+          for oauth_param in OPTIONAL_OAUTH_PARAMS:
+              if oauth_param in params:
+                  oauth_params[oauth_param] = params.pop(oauth_param)
+!             if not isinstance(data, bytes) and oauth_param in data:
+                  oauth_params[oauth_param] = data.pop(oauth_param)
+  
+              if params:

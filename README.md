@@ -4,6 +4,10 @@ Autosmug
 
 These scripts are for automating some SmugMug operations one might perform on a regular basis, for example, daily/weekly uploading new files in a local folder to a gallery on smugmug.
 
+Currently you can push a local directory and it's sub-directories to SmugMug utilizing the same folder structure. You can also push just one local directory to a SmugMug gallery.
+
+Local directories must contain a file (contents ignored) identifying whether the directory matches up with a Smugmug folder (.smfolder) or a gallery (.smgallery).
+
 
 Requirements
 ------------
@@ -22,6 +26,15 @@ You may need to patch rauth due to a Python 3 Type requirement (without this pat
 
 
 The original Python API interface (smugmug.py) and registration scripts (smregister & smregtest) were written by Marek Rei as part of his smuploader Github repo. These files have been duplicated here since, over time, changes are expected to be made that will not be backward compatible with other existing scripts/modules.
+
+
+TODO
+----
+
+1. Update template ability for gallery creation
+2. Add capability to remove images from SmugMug that are not in the local directory
+3. Clean up some code
+4. Add some error handling
 
 
 Copyright and License

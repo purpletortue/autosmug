@@ -1,5 +1,16 @@
 #!/usr/bin/env python3
-# smugsync v2
+# smugsync v2.2
+
+# to keep my sanity since local directories can be both folders and galleries in SmugMug
+# I use the following terminology in the code:
+
+# local filesystem directory intended to be a 'Folder' in SmugMug is called a directory
+# local filesystem directory intended to be a 'Gallery' in SmugMug is called an album
+# The code determines the directory 'type' by the presence of a file called .smgallery or .smfolder
+
+# Remote SmugMug Folder is called a folder
+# Remote SmugMug Gallery is caled a gallery
+
 
 from smugmug import SmugMug
 import argparse, sys, os, hashlib, json, time, mimetypes, fnmatch
@@ -32,7 +43,7 @@ def get_root_node_id(self):
     Get the root node ID of the account.
     Returns node id string
     """
-    #smugmug = SmugMug()
+    #smugmug = SmugMug() TODO: Add error handling
     response = self.request('GET', self.smugmug_api_base_url + "/user/"+self.username, headers={'Accept': 'application/json'})
     node = response['Response']['User']['Uris']['Node']
     node_id = node['Uri'].rsplit('/',1)[1]
@@ -74,7 +85,7 @@ def get_node_id(self, parent_node_id, node_name):
         print('Could not find node ' + node_name + ', under parent NodeID ' + parent_node_id)
     return False
 
-def get_base_node_id(self, path):
+def get_starting_node_id(self, path):
     parent_node_id = get_root_node_id(smugmug)
     node_path = []
     node_path = path('/')
@@ -287,6 +298,75 @@ def upload_files(self, album_id, image_paths):
 # Local filesystem modules
 #
 
+def is_album(dir_path):
+    """Determines if a given local directory should map to a SmugMug Folder or
+        Gallery by presence of a .smgallery file"""
+    if os.path.isfile(dir_path + "/.smgallery"):
+        return True
+    else:
+        return False
+
+def is_folder(dir_path):
+    """Determines if a given local directory should map to a SmugMug Folder or
+        Gallery by presence of a .smfolder file"""
+    if os.path.isfile(dir_path + "/.smfolder"):
+        return True
+    else:
+        return False
+
+def process_dir_as_gallery(dir_path, parent_node_id):
+    # Process local-directory as a gallery inside SmugMug Parent NodeID
+    dirname = dir_path.rsplit('/',1)[-1]
+    print('Processing album ' + dirname)
+    album_name = dirname
+    node_id = get_node_id(smugmug, parent_node_id, album_name)
+    if not node_id:
+        response = create_node(smugmug, parent_node_id, album_name, 'Album')
+        node_id = response
+
+    files = has_images(dir_path)
+    if files:
+        albumkey = get_album_key(smugmug, node_id)
+        upload_files(smugmug, albumkey, files)
+
+def process_dir_as_folder(dir_path, parent_node_id):
+    # Process local-directory as a folder inside SmugMug Parent NodeID
+    dirname = dir_path.rsplit('/',1)[-1]
+#    smugmug=SmugMug(args.verbose)
+    if args.verbose: print('Working on ' + directory)
+
+    node_id = get_node_id(smugmug, parent_node_id, dirname)
+    if not node_id:
+        print('creating node ' + dirname)
+        response = create_node(smugmug, parent_node_id, dirname, 'Folder')
+        node_id = response
+
+    #Check subdirectories for processing
+    subdirs = []
+    subdirs = has_dirs(dir_path)
+    if subdirs:
+        for subdir in subdirs:
+                if is_folder(subdir):
+                    print('Processing subdir as folder: ' + subdir)
+                    parent_node_id = node_id
+                    process_dir_as_folder(subdir, parent_node_id)
+                elif is_album(subdir):
+                    print('Processing subdir as gallery: ' + subdir)
+                    parent_node_id = node_id
+                    process_dir_as_gallery(subdir, parent_node_id)
+                else:
+                    skipped.append(subdir)
+
+def has_images(dir_path):
+    dir_contents = get_contents(dir_path)
+    """Get paths for all files in a directory, only 1 level deep"""
+    files = []
+    for entry in dir_contents:
+        if os.path.isfile(entry) and fnmatch.fnmatch(entry, '*.jpg'):
+            files.append(entry)
+    files.sort()
+    return files
+
 def get_contents(dir_path):
     """Get paths for all contents in a directory, only 1 level deep"""
     dir_contents = []
@@ -343,7 +423,7 @@ def process_directory(directory, parent_node_id):
         #        subnode_id = response
             process_directory(subdir, node_id)
 
-    #process as an album on smugmug
+    #process as a gallery on smugmug
     elif files:
         print('Processing album ' + dirname)
         if subdirs: print(subdirs)
@@ -358,46 +438,53 @@ def process_directory(directory, parent_node_id):
 
 
 def validate_args(args):
-    global Root_node_id
-    global Base_node_id
-    #confirm local directory exists
+    global root_node_id
+    global starting_node_id
+    global parent_node_id
+    #confirm starting local directory exists
     if not os.path.isdir(args.source):
         print("SOURCE directory ("+ args.source + ") does not exist")
         sys.exit(1)
-
-    #determine if directory given is intended as a folder (vice gallery)
-    contents = get_contents(args.source)
-    for entry in contents:
-        if os.path.isfile(entry):
-            print('Path specified has files, path should be a directory and only contain directories at the top level')
-            sys.exit(1)
+    #confirm starting local directory is a folder or gallery
+    target = ''
+    if is_album(args.source): target = 'Album'
+    if is_folder(args.source): target = 'Folder'
+    if not target:
+        print("SOURCE directory ("+ args.source + ") can not be identified as a gallery or folder")
+        print("The directory must contain either a .smfolder or .smgallery file in order to sync with SmugMug")
+        sys.exit(1)
 
     smugmug = SmugMug(args.verbose)
     #confirm starting node pre-exists in SmugMug
-    parent_node_id = Root_node_id
+    parent_node_id = root_node_id
     node_path = []
     node_path = args.dest.split('/')
+    #TODO: Should change to allow for node's with the same name at the same level
+    #TODO: Code also assumes Galleries are only at the end of the 'tree'
+    cur_node_id = root_node_id
     for node_name in node_path:
-        node_id = get_node_id(smugmug, parent_node_id, node_name)
-        parent_node_id = node_id
-    if not node_id:
-        print("Destination folder ("+ args.dest +") not found on SmugMug.")
-        print("Starting folder must pre-exist, subfolders/galleries will be created if needed")
+        parent_node_id = cur_node_id
+        cur_node_id = get_node_id(smugmug, parent_node_id, node_name)
+
+    if not cur_node_id:
+        print("Destination node ("+ args.dest +") not found on SmugMug.")
+        print("Starting node must pre-exist, subfolders/galleries will be created if needed")
         sys.exit(1)
     else:
-        Base_node_id = node_id
+        starting_node_id = cur_node_id
 
-    #confirm starting node is a folder type
-    response = smugmug.request('GET', smugmug.smugmug_api_base_url + "/node/"+node_id, headers={'Accept': 'application/json'})
-    if not response['Response']['Node']['Type'] == 'Folder':
-        print("Base folder must of a folder type and not an album nor page")
+    #confirm starting node matches local expectation
+    response = smugmug.request('GET', smugmug.smugmug_api_base_url + "/node/"+cur_node_id, headers={'Accept': 'application/json'})
+    if not response['Response']['Node']['Type'] == target:
+        print("DEST must match the expected node type of the SOURCE")
+        print("Expected " + target)
         sys.exit(1)
 
 if __name__ == '__main__':
 
-    parser = argparse.ArgumentParser(description='Sync (upload-only) local folder to SmugMug.')
+    parser = argparse.ArgumentParser(description='Sync (currently upload-only) local folder to SmugMug.')
     parser.add_argument('source', metavar='SOURCE', type=str, help='Local directory (tree) to upload')
-    parser.add_argument('dest', metavar='DEST', type=str, help='SmugMug destination folder (full path)')
+    parser.add_argument('dest', metavar='DEST', type=str, help='Full path to SmugMug destination node')
     #parser.add_argument('-a', '--album', dest='album', metavar='ALBUM_NAME', type=str, help='set album name')
     parser.add_argument('-t', '--template', dest='template', metavar='TEMPLATE_NAME', type=str, default='ArchiveGallery', help='set album template name')
     parser.add_argument('-r', '--resume', dest='resume', action='store_true', default=False, help='if album already exists, add photos in there. default: false')
@@ -407,15 +494,33 @@ if __name__ == '__main__':
     smugmug = SmugMug(args.verbose)
 
     #Smugmug basenode to sync with
-    Root_node_id = get_root_node_id(smugmug)
-    Base_node_id = None
-    #validate cli arguments and sets base_node_id
+    root_node_id = get_root_node_id(smugmug)
+    starting_node_id = None
+    parent_node_id = None
+
+    #validate cli arguments and sets starting_node_id as the given starting point
     validate_args(args)
-    #print(Base_node_id)
+    #print(starting_node_id)
+    #print(parent_node_id)
+    skipped = []
+    if is_album(args.source):
+        process_dir_as_gallery(args.source, parent_node_id)
+
+    if is_folder(args.source):
+        process_dir_as_folder(args.source, parent_node_id)
+
+    #TODO: Pretty the skipped output 
+    if skipped:
+        print("The following directories were skipped due to no .smgallery/.smfolder file")
+        print(skipped)
+
+"""
     dirs = []
+    print(args.source)
     dirs = has_dirs(args.source)
     for directory in dirs:
-        process_directory(directory, Base_node_id)
+        process_directory(directory, starting_node_id)
+"""
 
 """
 for each directory

@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
-# smugsync v2.2
+# smugsync v2.3-pre
+# 2.3 adding template capability..
+#TODO need to figure out templateURI not templateID
 
 # to keep my sanity since local directories can be both folders and galleries in SmugMug
 # I use the following terminology in the code:
@@ -34,9 +36,10 @@ def list_albums(verbose):
 def get_template_id(template_name):
     template_id = None
     template_id = smugmug.get_template_id(template_name)
-    if template_id == None:
-        print('Error: Could not find album template named \'' + template_name + '\'')
-        sys.exit(1)
+    if template_id:
+        return template_id
+    else:
+        return None
 
 def get_root_node_id(self):
     """
@@ -254,6 +257,7 @@ def upload_files(self, album_id, image_paths):
                             print(result)
                             sys.exit(1)
                         print('Done')
+                        #if is_rated():
                 except IOError as e:
                     print("I/O error({0}): {1}".format(e.errno, e.strerror))
                     raise
@@ -291,6 +295,22 @@ def upload_files(self, album_id, image_paths):
         print('Warning: You selected ' + str(len(args.images)) + ' images, but there are ' + str(len(existing_images)) + ' in the online album.')
 
     print('Album done')
+
+#TODO
+def update_comment_rating(self, image_data, image_name, image_type, album_id, image_uri):
+    """Upload and overwrite an existing image"""
+    response = self.request('POST', self.smugmug_upload_uri,
+        data=image_data,
+        header_auth = True,
+        headers={'X-Smug-AlbumUri': "/api/v2/album/"+album_id,
+            'X-Smug-Version':self.smugmug_api_version,
+            'X-Smug-ResponseType':'JSON',
+            'Content-MD5': hashlib.md5(image_data).hexdigest(),
+            'X-Smug-FileName':image_name,
+            'Content-Length' : str(len(image_data)),
+            'Content-Type': image_type,
+            'X-Smug-ImageUri': image_uri})
+    return response
 
 
 
@@ -441,6 +461,7 @@ def validate_args(args):
     global root_node_id
     global starting_node_id
     global parent_node_id
+    global template_id
     #confirm starting local directory exists
     if not os.path.isdir(args.source):
         print("SOURCE directory ("+ args.source + ") does not exist")
@@ -480,14 +501,20 @@ def validate_args(args):
         print("Expected " + target)
         sys.exit(1)
 
+    if args.template:
+        template_id = get_template_id(args.template)
+        if not template_id:
+            print('Error: Could not find album template named \'' + args.template + '\'')
+            sys.exit(1)
+
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser(description='Sync (currently upload-only) local folder to SmugMug.')
     parser.add_argument('source', metavar='SOURCE', type=str, help='Local directory (tree) to upload')
     parser.add_argument('dest', metavar='DEST', type=str, help='Full path to SmugMug destination node')
     #parser.add_argument('-a', '--album', dest='album', metavar='ALBUM_NAME', type=str, help='set album name')
-    parser.add_argument('-t', '--template', dest='template', metavar='TEMPLATE_NAME', type=str, default='ArchiveGallery', help='set album template name')
-    parser.add_argument('-r', '--resume', dest='resume', action='store_true', default=False, help='if album already exists, add photos in there. default: false')
+    parser.add_argument('-t', '--template', dest='template', metavar='TEMPLATE_NAME', type=str, default='', help='use gallery preset when creating new galeries')
+    #parser.add_argument('-r', '--resume', dest='resume', action='store_true', default=False, help='if album already exists, add photos in there. default: false')
     parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', default=False, help='verbose output')
     args = parser.parse_args()
 
@@ -497,6 +524,7 @@ if __name__ == '__main__':
     root_node_id = get_root_node_id(smugmug)
     starting_node_id = None
     parent_node_id = None
+    template_id = None
 
     #validate cli arguments and sets starting_node_id as the given starting point
     validate_args(args)
@@ -509,7 +537,7 @@ if __name__ == '__main__':
     if is_folder(args.source):
         process_dir_as_folder(args.source, parent_node_id)
 
-    #TODO: Pretty the skipped output 
+    #TODO: Pretty the skipped output
     if skipped:
         print("The following directories were skipped due to no .smgallery/.smfolder file")
         print(skipped)

@@ -1,6 +1,6 @@
 certifi==2019.6.16
 chardet==3.0.4
-httplib2==0.13.0
+httplib2==0.18.0
 idna==2.8
 pkg-resources==0.0.0
 rauth==0.7.3

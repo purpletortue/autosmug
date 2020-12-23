@@ -18,14 +18,15 @@ To install autosmug:
 	cd autosmug  
 	python3 -m venv env  
 	source env/bin/activate  
-  pip3 install -r requirements.txt
+  pip3 install -r requirements.txt  
+  (Note you will need to create the .smugmug.cfg file in your home directory for the authentication to work, see Marek Rei's Github repo for more info)  
 
 You may need to patch rauth due to a Python 3 Type requirement (without this patch POST methods to the API will fail):
 
   patch -p0 -i rauth.patch
 
 
-The original Python API interface (smugmug.py) and registration scripts (smregister & smregtest) were written by Marek Rei as part of his smuploader Github repo. These files have been duplicated here since, over time, changes are expected to be made that will not be backward compatible with other existing scripts/modules.
+The original Python API interface (smugmug.py) and registration scripts (smregister & smregtest) were written by Marek Rei as part of his smuploader Github repo. Some of those files (smugmug.py) have been duplicated here since, over time, I expect to make changes that will not be backward compatible with the other existing scripts/modules.
 
 
 TODO
@@ -33,8 +34,9 @@ TODO
 
 1. Update template ability for gallery creation
 2. Add capability to remove images from SmugMug that are not in the local directory
-3. Clean up some code
-4. Add some error handling
+3. Add auth file creation procedure
+4. Clean up some code
+5. Add some error handling
 
 
 Copyright and License

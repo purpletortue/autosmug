@@ -5,4 +5,4 @@ idna==2.8
 pkg-resources==0.0.0
 rauth==0.7.3
 requests==2.22.0
-urllib3==1.25.3
+urllib3==1.26.5

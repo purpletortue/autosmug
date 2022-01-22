@@ -13,6 +13,7 @@
 
 
 from smugmug import SmugMug
+from pathlib import Path
 import argparse, sys, os, hashlib, json, time, mimetypes, fnmatch
 
 #
@@ -50,7 +51,6 @@ def get_root_node_id(self):
     #print(node_id)
     return node_id
 
-
 def get_child_nodes(self, parent_node_id):
     """
     Get a list of child nodes given the parents node_id
@@ -70,7 +70,6 @@ def get_child_nodes(self, parent_node_id):
         else:
             break
     return nodes
-
 
 def get_node_id(self, parent_node_id, node_name):
     """
@@ -183,6 +182,7 @@ def create_tree(self, source, dest):
             else:
                 print(folder_name + ' folder exists')
             create_tree(self, subdir, subdir_node)
+
 def upload_image(self, image_data, image_name, image_type, album_id):
     """Upload an image"""
     response = self.request('POST', self.smugmug_upload_uri,
@@ -195,6 +195,17 @@ def upload_image(self, image_data, image_name, image_type, album_id):
             'X-Smug-FileName':image_name,
             'Content-Length' : str(len(image_data)),
             'Content-Type': image_type})
+    return response
+
+def remove_image(self, image_uri):
+    """Remove an image"""
+    #print(image_uri)
+    response = self.request('DELETE', 'https://api.smugmug.com'+image_uri,
+        header_auth = True,
+        headers={'Accept': 'application/json',
+            'X-Smug-Version':self.smugmug_api_version,
+            'X-Smug-ResponseType':'JSON'})
+    #print(response)
     return response
 
 def upload_overwrite_image(self, image_data, image_name, image_type, album_id, image_uri):
@@ -290,9 +301,34 @@ def upload_files(self, album_id, image_paths):
     if len(image_paths) != len(image_paths):
         print('Warning: You selected ' + str(len(args.images)) + ' images, but there are ' + str(len(existing_images)) + ' in the online album.')
 
-    print('Album done')
+    #print('Album done')
 
+def remove_images(self, album_id, local_path):
+    # Remove files from gallery that do not exist locally
 
+    #album_image_names = smugmug.get_album_image_names(album_id)
+    album_images = smugmug.get_album_images(album_id)
+    resolved_path = Path(local_path).resolve()
+    str_path = str(resolved_path)
+    image_uris = []
+    for image in album_images:
+        #print(image)
+        filename = image['FileName']
+        #print(local_path)
+        local_file = str_path + '/' + filename
+        if not Path(local_file).is_file():
+            image_uris.append(image['Uri'])
+
+    if len(image_uris) == 0:
+        print("Album done")
+    elif 0 < len(image_uris) < (len(album_images) * .15) :
+        print("Removing",len(image_uris),"images from album")
+        for image_uri in image_uris:
+            result = remove_image(smugmug, image_uri)
+        print("Album done")
+    elif len(image_uris) >= (len(album_images) * .15):
+        print("More images to remove than reasonably expected, skipping removal.")
+        print("Album not done")
 
 #
 # Local filesystem modules
@@ -328,12 +364,13 @@ def process_dir_as_gallery(dir_path, parent_node_id):
     if files:
         albumkey = get_album_key(smugmug, node_id)
         upload_files(smugmug, albumkey, files)
+        remove_images(smugmug, albumkey, dir_path)
 
 def process_dir_as_folder(dir_path, parent_node_id):
     # Process local-directory as a folder inside SmugMug Parent NodeID
     dirname = dir_path.rsplit('/',1)[-1]
 #    smugmug=SmugMug(args.verbose)
-    if args.verbose: print('Working on ' + directory)
+    if args.verbose: print('Working on ' + dirname)
 
     node_id = get_node_id(smugmug, parent_node_id, dirname)
     if not node_id:
@@ -509,7 +546,7 @@ if __name__ == '__main__':
     if is_folder(args.source):
         process_dir_as_folder(args.source, parent_node_id)
 
-    #TODO: Pretty the skipped output 
+    #TODO: Pretty the skipped output
     if skipped:
         print("The following directories were skipped due to no .smgallery/.smfolder file")
         print(skipped)

@@ -1,5 +1,5 @@
-*** lib/python3.8/site-packages/rauth/session.py.bak	2019-10-19 14:04:09.476368601 -0700
---- lib/python3.8/site-packages/rauth/session.py	2019-08-31 18:53:38.216846853 -0700
+*** lib/python3.9/site-packages/rauth/session.py.bak	2019-10-19 14:04:09.476368601 -0700
+--- lib/python3.9/site-packages/rauth/session.py	2019-08-31 18:53:38.216846853 -0700
 ***************
 *** 183,190 ****
           if header_auth and 'oauth_signature' not in \

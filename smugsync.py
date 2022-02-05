@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# smugsync v2.2
+# smugsync v2.3
 
 # to keep my sanity since local directories can be both folders and galleries in SmugMug
 # I use the following terminology in the code:

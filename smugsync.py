@@ -11,7 +11,6 @@
 # Remote SmugMug Folder is called a folder
 # Remote SmugMug Gallery is caled a gallery
 
-
 from smugmug import SmugMug
 from pathlib import Path
 import argparse, sys, os, hashlib, json, time, mimetypes, fnmatch
@@ -350,8 +349,9 @@ def is_folder(dir_path):
     else:
         return False
 
-def process_dir_as_gallery(dir_path, parent_node_id):
+def process_dir_as_gallery(directory, parent_node_id):
     # Process local-directory as a gallery inside SmugMug Parent NodeID
+    dir_path = str(Path(directory).resolve())
     dirname = dir_path.rsplit('/',1)[-1]
     print('Processing album ' + dirname)
     album_name = dirname
@@ -366,8 +366,9 @@ def process_dir_as_gallery(dir_path, parent_node_id):
         upload_files(smugmug, albumkey, files)
         remove_images(smugmug, albumkey, dir_path)
 
-def process_dir_as_folder(dir_path, parent_node_id):
+def process_dir_as_folder(directory, parent_node_id):
     # Process local-directory as a folder inside SmugMug Parent NodeID
+    dir_path = str(Path(directory).resolve())
     dirname = dir_path.rsplit('/',1)[-1]
 #    smugmug=SmugMug(args.verbose)
     if args.verbose: print('Working on ' + dirname)
